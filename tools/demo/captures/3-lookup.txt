@@ -1,0 +1,2 @@
+mcsrc: LivingEntity has no method 'hurt' (searched the class and its supertypes). Similar: getHurtSound, hurtByWater, playHurtSound
+In yarn mappings (this project) that name is: Entity#damage

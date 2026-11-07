@@ -1,0 +1,10 @@
+FAILED
+MIXIN: mixin target not found: Critical injection failure: @Inject annotation on villagerswarm$onHurt could not find any targets matching 'hurt' in net/minecraft/entity/LivingEntity.
+MIXIN: mixin transformation failed: Mixin transformation of net.minecraft.entity.LivingEntity failed
+  -> check the target: mcsrc.py method net.minecraft.entity.LivingEntity#hurt
+EXCEPTION: (see above)
+    at net.minecraft.Bootstrap.initialize(Bootstrap.java:46)
+    at net.minecraft.server.Main.main(Main.java:105)
+    at net.fabricmc.devlaunchinjector.Main.main(Main.java:86)
+CAUSE: org.spongepowered.asm.mixin.transformer.throwables.MixinTransformerError: An unexpected critical error was encountered
+CAUSE: org.spongepowered.asm.mixin.throwables.MixinApplyError: Mixin [villagerswarm.mixins.json:LivingEntityMixin from mod villagerswarm] from phase [DEFAULT] in config [villagerswarm.mixins.json] FAILED during APPLY
