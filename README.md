@@ -15,7 +15,37 @@ public boolean damage(DamageSource source, float amount)
   full:         Lnet/minecraft/entity/LivingEntity;damage(Lnet/minecraft/entity/damage/DamageSource;F)Z
 ```
 
-Works with Fabric (1.14+, Yarn or Mojang mappings) and NeoForge (1.20.2+). Needs Python 3.9+ and nothing else.
+Pasted a snippet written for Mojang names into a Yarn project? `translate` maps it for you:
+
+```
+$ python mcsrc.py method LivingEntity#hurt
+mcsrc: LivingEntity has no method 'hurt' (searched the class and its supertypes).
+In yarn mappings (this project) that name is: Entity#damage
+```
+
+The build loop catches what compiles but breaks at startup, like a mixin aimed at a method that does
+not exist:
+
+```
+$ python mcbuild.py server
+FAILED
+MIXIN: mixin target not found: Critical injection failure: @Inject annotation on mymod$onHurt
+       could not find any targets matching 'hurt' in net/minecraft/entity/LivingEntity.
+  -> check the target: mcsrc.py method net.minecraft.entity.LivingEntity#hurt
+```
+
+Targets Fabric (1.14+, Yarn or Mojang mappings) and NeoForge (1.20.2+). Needs Python 3.9+ and nothing else.
+
+## What's inside
+
+| Piece | Does |
+|-------|------|
+| `mc-source-lookup` | `mcsrc.py`: classes, methods, fields, decompiled source, vanilla JSON resources, Mojang/Yarn translation |
+| `mc-build-loop` | `mcbuild.py`: compile, build, boot a dedicated server, summarize crash reports |
+| `mc-project-detect` | loader, Minecraft version, mappings and Java version of the project |
+| `mc-mixins`, `mc-blocks-items`, `mc-entities` | how to build each kind of feature for the version you are on |
+| agents | `mod-designer`, `mixin-specialist`, `entity-specialist`, `asset-builder`, `mod-reviewer` |
+| commands | `/new-mod`, `/fix-crash` |
 
 ## Install
 
@@ -30,8 +60,8 @@ Codex, Cursor and other agents: copy `skills/` into your agent's skills folder a
 
 ## Status
 
-Early. Source lookup and project detection work. Build loop, crash diagnosis, version porting and
-agent roles come next.
+Early. Tested on Fabric 1.21.1 with Yarn. NeoForge testing is in progress; version porting
+(`/port-version`) and a benchmark come next.
 
 ## License
 
