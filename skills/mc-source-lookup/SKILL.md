@@ -27,7 +27,12 @@ python scripts/mcsrc.py method LivingEntity#damage     # overloads + mixin descr
 python scripts/mcsrc.py field LivingEntity#lastDamageTaken
 python scripts/mcsrc.py search 'BlockBreak' [--members] # regex over class (and method) names
 python scripts/mcsrc.py source LivingEntity#damage     # decompiled body, needs a sources jar
+python scripts/mcsrc.py files 'diamond_sword'          # resource paths (assets/, data/) in the jars
+python scripts/mcsrc.py cat data/minecraft/recipe/diamond_sword.json  # vanilla JSON for this version
 ```
+
+Model, blockstate, recipe, loot table and tag formats change between versions too. Copy the vanilla
+file from `cat` instead of writing JSON from memory.
 
 `Class` accepts a simple name (`Entity`), a nested name (`PlayerBlockBreakEvents.Before`) or a full name
 (`net.minecraft.entity.Entity`). When several classes share a name, the script uses the vanilla

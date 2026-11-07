@@ -11,6 +11,8 @@ Java syntax plus the descriptor string a mixin needs. No decompiler, no deps.
     mcsrc.py field LivingEntity#lastDamageTaken
     mcsrc.py search 'Damage.*Source' [--members]
     mcsrc.py source LivingEntity#damage
+    mcsrc.py files 'diamond_sword'
+    mcsrc.py cat data/minecraft/recipe/diamond_sword.json
 """
 from __future__ import annotations
 
@@ -621,6 +623,36 @@ def cmd_source(idx: dict, args) -> None:
         sys.exit(f"mcsrc: '{mname}' not found in {outer}")
 
 
+def cmd_files(jars: list[str], args) -> None:
+    rx = re.compile(args.pattern, re.I)
+    n = 0
+    for jar in jars:
+        with zipfile.ZipFile(jar) as z:
+            for name in z.namelist():
+                if not name.endswith(("/", ".class")) and rx.search(name):
+                    print(name)
+                    n += 1
+                    if n >= args.limit:
+                        print(f"# stopped at {args.limit} results, refine the pattern")
+                        return
+    if not n:
+        sys.exit(f"mcsrc: no resource matches '{args.pattern}'")
+
+
+def cmd_cat(jars: list[str], args) -> None:
+    for jar in jars:
+        with zipfile.ZipFile(jar) as z:
+            try:
+                data = z.read(args.path)
+            except KeyError:
+                continue
+        if args.path.endswith((".png", ".ogg", ".nbt")):
+            sys.exit(f"mcsrc: {args.path} is binary ({len(data)} bytes)")
+        print(data.decode("utf-8", errors="replace"))
+        return
+    sys.exit(f"mcsrc: {args.path} not found. List candidates with: mcsrc.py files '<pattern>'")
+
+
 # ---------------------------------------------------------------- main
 
 
@@ -643,6 +675,11 @@ def main() -> None:
     p = sub.add_parser("source", help="print decompiled source of Class or Class#method")
     p.add_argument("spec")
     p.add_argument("--lines", type=int, default=80)
+    p = sub.add_parser("files", help="regex over resource paths (assets/, data/) in the jars")
+    p.add_argument("pattern")
+    p.add_argument("--limit", type=int, default=60)
+    p = sub.add_parser("cat", help="print a resource file, e.g. data/minecraft/recipe/diamond_sword.json")
+    p.add_argument("path")
     args = ap.parse_args()
 
     try:
@@ -663,6 +700,10 @@ def main() -> None:
         task = "./gradlew compileJava" if info["loader"] == "neoforge" else "./gradlew build"
         sys.exit(f"mcsrc: no named Minecraft jar found for {info['loader']} {info.get('minecraft_version')}. "
                  f"Run `{task}` once so the toolchain sets up Minecraft, then retry.")
+    if args.cmd in ("files", "cat"):
+        all_jars = jars["minecraft"] + jars["api"]
+        (cmd_files if args.cmd == "files" else cmd_cat)(all_jars, args)
+        return
     idx = load_index(root, jars["minecraft"] + jars["api"])
     {"class": cmd_class, "method": cmd_method, "field": cmd_field,
      "search": cmd_search, "source": cmd_source}[args.cmd](idx, args)
