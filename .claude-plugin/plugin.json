@@ -1,0 +1,13 @@
+{
+  "name": "mixinsmith",
+  "version": "0.1.0",
+  "description": "Minecraft modding studio for AI coding agents: look up the real Fabric and NeoForge API of your project, on any Minecraft version.",
+  "author": {
+    "name": "A2M33",
+    "url": "https://github.com/A2M33"
+  },
+  "homepage": "https://github.com/A2M33/mixinsmith",
+  "repository": "https://github.com/A2M33/mixinsmith",
+  "license": "MIT",
+  "keywords": ["minecraft", "fabric", "neoforge", "modding", "mixin", "skills"]
+}

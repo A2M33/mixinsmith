@@ -1,0 +1,13 @@
+{
+  "name": "mixinsmith",
+  "owner": {
+    "name": "A2M33"
+  },
+  "plugins": [
+    {
+      "name": "mixinsmith",
+      "source": "./",
+      "description": "Minecraft modding studio for AI coding agents: look up the real Fabric and NeoForge API of your project, on any Minecraft version."
+    }
+  ]
+}
