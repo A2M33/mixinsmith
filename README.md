@@ -6,6 +6,8 @@ Your coding agent remembers the Minecraft API of some old version. Your mod targ
 the agent writes `damage()` where your mappings say `hurt()`, invents methods that never existed, and you
 burn a build cycle on every guess.
 
+![A mixin aimed at the Mojang name hurt compiles, crashes the server, and mcsrc points to Entity#damage, after which the server boots](assets/demo.gif)
+
 mixinsmith gives the agent the API of *your* project. A small script reads the named Minecraft, Fabric
 API and NeoForge jars that Gradle already downloaded and prints real signatures, plus the exact descriptor
 a mixin needs:
