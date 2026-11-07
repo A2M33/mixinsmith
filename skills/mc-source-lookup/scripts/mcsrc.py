@@ -15,6 +15,7 @@ Java syntax plus the descriptor string a mixin needs. No decompiler, no deps.
 from __future__ import annotations
 
 import argparse
+import difflib
 import glob
 import hashlib
 import json
@@ -537,8 +538,9 @@ def cmd_method(idx: dict, args) -> None:
         if found:
             break  # nearest declaration wins; overrides higher up are noise
     if not found:
-        near = sorted({m[1] for o in supers(idx, cn) for m in idx["classes"][o]["methods"]
-                       if mname.lower() in m[1].lower()})
+        names = {m[1] for o in supers(idx, cn) for m in idx["classes"][o]["methods"] if not m[1].startswith("<")}
+        near = sorted(n for n in names if mname.lower() in n.lower())
+        near += [n for n in difflib.get_close_matches(mname, names, n=6, cutoff=0.6) if n not in near]
         msg = f"mcsrc: {simple(cn)} has no method '{mname}' (searched the class and its supertypes)."
         if near:
             msg += " Similar: " + ", ".join(near[:12])
@@ -563,14 +565,17 @@ def cmd_field(idx: dict, args) -> None:
 def cmd_search(idx: dict, args) -> None:
     rx = re.compile(args.pattern, re.I)
     n = 0
-    for cn, k in sorted(idx["classes"].items()):
+    # loader mixin classes are implementation details, never something a mod should call
+    items = [(cn, k) for cn, k in idx["classes"].items() if "/mixin/" not in cn]
+    items.sort(key=lambda it: (not it[0].startswith(("net/minecraft/", "com/mojang/")), it[0]))
+    for cn, k in items:
         if rx.search(cn.split("/")[-1]):
             print(cn.replace("/", "."))
             n += 1
         if args.members:
             for m in k["methods"]:
                 if rx.search(m[1]) and not m[0] & 0x1040:
-                    print(f"{cn.replace('/', '.')}#{fmt_method(cn, m)}")
+                    print(f"{simple(cn)}#{m[1]}    {fmt_method(cn, m)}")
                     n += 1
         if n >= args.limit:
             print(f"# stopped at {args.limit} results, refine the pattern")
