@@ -46,9 +46,16 @@ def loader(root: Path) -> str:
             text += p.read_text(encoding="utf-8", errors="replace")
     if "fabric-loom" in text:
         return "fabric"
+    if "net.neoforged.gradle" in text:
+        return "neogradle"
     if "net.neoforged" in text:
         return "neoforge"
     return "unknown"
+
+
+def server_dir(root: Path) -> Path:
+    # Loom and ModDevGradle start every run in run/; the older NeoGradle uses runs/<run name>
+    return root / ("runs/server" if loader(root) == "neogradle" else "run")
 
 
 # ---------------------------------------------------------------- diagnosis
@@ -71,6 +78,12 @@ LOADER_PATTERNS = [
     (re.compile(r"Missing or unsupported mandatory dependencies:(.*)"), "missing dependency"),
     (re.compile(r"Failed to load registry (.+)|Registry .+ is missing (.+)"), "registry problem"),
     (re.compile(r"Couldn't parse data file (\S+)|Failed to parse (\S+\.json)"), "bad data/asset json"),
+]
+JAVA_PATTERNS = [
+    re.compile(r"JAVA_HOME is not set and no 'java' command could be found.*"),
+    re.compile(r"JAVA_HOME is set to an invalid directory.*"),
+    re.compile(r"Unsupported class file major version \d+"),
+    re.compile(r"Dependency requires at least JVM runtime version \d+.*"),
 ]
 GRADLE_FAIL = re.compile(r"^\* What went wrong:\s*$")
 LOG_PREFIX = re.compile(r"^\[[\d:.]+\] \[[^\]]+\](?: \([^)]+\))?:? ")
@@ -136,7 +149,17 @@ def diagnose(text: str, root: Path | None = None) -> list[str]:
         else:
             out.append(item)
 
-    # 4. Gradle's own "What went wrong" block when nothing above explains it
+    # 4. Gradle could not start or runs on a JDK it cannot use
+    if not out:
+        for rx in JAVA_PATTERNS:
+            m = next((m for m in map(rx.search, lines) if m), None)
+            if m:
+                out.append(f"JAVA: {m.group(0).strip()}")
+                out.append("  -> point JAVA_HOME at a JDK that both Gradle and the project accept, then retry "
+                           "(see 'Java version' in the mc-build-loop skill)")
+                break
+
+    # 5. Gradle's own "What went wrong" block when nothing above explains it
     if not out:
         for i, line in enumerate(lines):
             if GRADLE_FAIL.match(line):
@@ -216,12 +239,16 @@ def run_gradle(root: Path, tasks: list[str]) -> tuple[int, str]:
     return p.returncode, p.stdout + "\n" + p.stderr
 
 
-def report(ok: bool, items: list[str], ok_msg: str) -> int:
+def report(ok: bool, items: list[str], ok_msg: str, log: str = "") -> int:
     if ok and not [i for i in items if i.startswith(("COMPILE", "MIXIN", "EXCEPTION"))]:
         print(ok_msg)
         return 0
     print("FAILED")
-    print("\n".join(items) if items else "No known pattern matched. Re-run with --raw to see the log tail.")
+    if items:
+        print("\n".join(items))
+    else:
+        tail = [s for s in log.splitlines() if s.strip()][-12:]
+        print("No known pattern matched." + (" Last log lines:\n" + "\n".join(tail) if tail else ""))
     return 1
 
 
@@ -229,12 +256,12 @@ def cmd_build(root: Path, args, tasks: list[str], ok_msg: str) -> int:
     code, log = run_gradle(root, tasks)
     if args.raw:
         print("\n".join(log.splitlines()[-80:]))
-    return report(code == 0, diagnose(log, root) if code else [], ok_msg)
+    return report(code == 0, diagnose(log, root) if code else [], ok_msg, log)
 
 
 def cmd_server(root: Path, args) -> int:
     ld = loader(root)
-    run_dir = root / ("runs/server" if ld == "neoforge" else "run")
+    run_dir = server_dir(root)
     eula = run_dir / "eula.txt"
     if not (eula.is_file() and "eula=true" in eula.read_text(errors="replace")):
         if not args.accept_eula:
@@ -290,7 +317,7 @@ def cmd_server(root: Path, args) -> int:
         items += crash_report(crash)
     if not done.is_set():
         items.insert(0, f"TIMEOUT: server did not finish loading within {args.timeout}s")
-    return report(False, items, "")
+    return report(False, items, "", text)
 
 
 def main() -> int:

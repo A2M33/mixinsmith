@@ -5,6 +5,8 @@ Class-file tests compile small Java fixtures and skip when no `javac` is on PATH
 """
 from __future__ import annotations
 
+import contextlib
+import io
 import os
 import shutil
 import subprocess
@@ -196,7 +198,8 @@ class PortTests(unittest.TestCase):
         (src / "A.java").write_text("import net.minecraft.old.Dir;\nclass A { float f(Dir d) { return d.asRotation(); } }\n",
                                     encoding="utf-8")
         mcport.scan.hidden = 0
-        self.assertGreater(mcport.scan(src, d, apply_imports=True), 0)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertGreater(mcport.scan(src, d, apply_imports=True), 0)
         self.assertIn("import net.minecraft.util.Dir;", (src / "A.java").read_text(encoding="utf-8"))
 
 
@@ -261,6 +264,20 @@ class DiagnoseTests(unittest.TestCase):
         self.assertIn("mcsrc.py method net.minecraft.entity.LivingEntity#hurt", "\n".join(out))
         self.assertIn("    at com.example.Mod.init(Mod.java:9)", out)
         self.assertNotIn("more", "\n".join(out))
+
+    def test_missing_jdk(self):
+        log = "\nERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.\n"
+        out = mcbuild.diagnose(log)
+        self.assertTrue(out[0].startswith("JAVA: JAVA_HOME is not set"))
+
+    def test_server_run_dir(self):
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, True)
+        for plugin, run in (("net.neoforged.moddev", "run"), ("fabric-loom", "run"),
+                            ("net.neoforged.gradle.userdev", "runs/server")):
+            (d / "build.gradle").write_text(f"plugins {{ id '{plugin}' }}", encoding="utf-8")
+            self.assertEqual(mcbuild.server_dir(d), d / run, plugin)
+
 
 
 if __name__ == "__main__":
