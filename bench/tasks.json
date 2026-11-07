@@ -1,0 +1,32 @@
+[
+  {
+    "id": "ruby-item",
+    "prompt": "Add a new item `villagerswarm:ruby`. It must appear in the Ingredients creative tab, have an English name \"Ruby\", an item model that uses the texture `villagerswarm:item/ruby`, and a shapeless recipe that turns one emerald into one ruby.",
+    "boot": true
+  },
+  {
+    "id": "ruby-block",
+    "prompt": "Add a new block `villagerswarm:ruby_block` with a block item. It is as hard as an iron block, needs a pickaxe, drops itself when mined, has an English name \"Block of Ruby\", a blockstate and models using the texture `villagerswarm:block/ruby_block`.",
+    "boot": true
+  },
+  {
+    "id": "villager-armor",
+    "prompt": "Write a mixin so villagers take only half damage from every source. Use a mixin, not an event.",
+    "boot": true
+  },
+  {
+    "id": "wake-message",
+    "prompt": "Write a mixin so that whenever a player wakes up from a bed, the server sends that player the chat message \"Good morning!\".",
+    "boot": true
+  },
+  {
+    "id": "diamond-xp",
+    "prompt": "When a player breaks a diamond ore or deepslate diamond ore block, give them one experience level. Use a Fabric API event.",
+    "boot": true
+  },
+  {
+    "id": "zombie-torch",
+    "prompt": "Make zombies run away from any player within 8 blocks who holds a torch in their main hand. Add it as an AI goal on the zombie.",
+    "boot": true
+  }
+]
