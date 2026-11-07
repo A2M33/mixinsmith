@@ -73,6 +73,7 @@ LOADER_PATTERNS = [
     (re.compile(r"Couldn't parse data file (\S+)|Failed to parse (\S+\.json)"), "bad data/asset json"),
 ]
 GRADLE_FAIL = re.compile(r"^\* What went wrong:\s*$")
+LOG_PREFIX = re.compile(r"^\[[\d:.]+\] \[[^\]]+\](?: \([^)]+\))?:? ")
 
 
 def diagnose(text: str, root: Path | None = None) -> list[str]:
@@ -114,11 +115,16 @@ def diagnose(text: str, root: Path | None = None) -> list[str]:
     for line in lines:
         for pats, label in ((MIXIN_PATTERNS, "MIXIN"), (LOADER_PATTERNS, "LOADER")):
             hit = next(((rx, kind) for rx, kind in pats if rx.search(line)), None)
-            if hit and line.strip()[:200] not in seen:
-                seen.add(line.strip()[:200])
-                msg = re.sub(r"^(Caused by: )?[\w.$]+: ", "", line.strip())
+            if not hit:
+                continue
+            msg = LOG_PREFIX.sub("", line.strip())
+            # the same failure is logged several times with different wrappers; key on its core
+            core = re.search(r"(Critical injection failure: .+?)(?: No refMap| Using refmap| \[|$)", msg)
+            msg = core.group(1) if core else re.sub(r"^(Caused by: )?[\w.$]+: ", "", msg)
+            if msg[:160] not in seen:
+                seen.add(msg[:160])
                 out.append(f"{label}: {hit[1]}: {msg[:300]}")
-                break
+            break
     for t in sorted(set(re.findall(r"could not find any targets matching '([^']+)' in ([\w/$]+)", text))):
         name = t[0].split("(")[0].split(":")[0].lstrip("L").split(";")[-1]
         out.append(f"  -> check the target: mcsrc.py method {t[1].replace('/', '.')}#{name}")
@@ -148,23 +154,33 @@ def exception_summary(lines: list[str]) -> list[str]:
     out = []
     i = 0
     shown = 0
+    seen: set[tuple] = set()
     while i < len(lines) and shown < 3:
-        line = lines[i].strip()
+        line = LOG_PREFIX.sub("", lines[i].strip())
         m = re.match(r"(?:Caused by: )?([\w.$]+(?:Exception|Error))(?::\s*(.*))?$", line)
         if m and i + 1 < len(lines) and lines[i + 1].strip().startswith("at "):
             frames = []
             j = i + 1
             while j < len(lines) and lines[j].strip().startswith(("at ", "...")):
-                fr = lines[j].strip()[3:]
+                s = lines[j].strip()
+                j += 1
+                if not s.startswith("at "):
+                    continue  # "... 18 more"
+                fr = re.sub(r"\s+~?\[[^\]]*\]$", "", s[3:])  # drop "[jar:version]"
+                fr = re.sub(r"^[\w.-]+/", "", fr)  # drop "knot/" / module prefixes
                 if not fr.startswith(INTERNAL):
                     frames.append(fr)
-                j += 1
+            # wrappers re-throw with a new message but the same frames
+            key = tuple(frames[:4]) if frames else (m.group(1), m.group(2))
+            i = j
+            if key in seen:
+                continue  # same trace logged twice (log + crash report)
+            seen.add(key)
             label = "CAUSE" if line.startswith("Caused by") else "EXCEPTION"
             out.append(f"{label}: {m.group(1)}: {(m.group(2) or '')[:240]}")
             for fr in frames[:4]:
                 out.append(f"    at {fr}")
             shown += 1
-            i = j
             continue
         i += 1
     return out
