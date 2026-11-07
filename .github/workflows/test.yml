@@ -11,6 +11,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python: ["3.9", "3.13"]
+        exclude:
+          - os: ubuntu-latest  # runner image no longer ships 3.9; Windows and macOS still cover it
+            python: "3.9"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
