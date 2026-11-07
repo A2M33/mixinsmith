@@ -5,6 +5,9 @@ description: Port a Fabric or NeoForge mod from one Minecraft version to another
 
 # Port to another Minecraft version
 
+The script is `scripts/mcport.py` in this skill's folder. Run it from the mod project root or pass
+`--project <dir>`.
+
 ```
 python scripts/mcport.py --from 1.21.1 --to 1.21.4               # report for ./src
 python scripts/mcport.py --from 1.21.1 --to 1.21.4 --apply-imports

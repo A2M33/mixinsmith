@@ -11,6 +11,9 @@ Run this first. Every later decision (class names, registration style, file layo
 python ../mc-source-lookup/scripts/mcsrc.py detect
 ```
 
+The path is relative to this skill's folder; run the command with the mod project root as the working
+directory, or add `--project <dir>` before `detect`.
+
 It prints JSON: `loader`, `minecraft_version`, `mappings`, `java`, `loader_version` and the jars that
 `mc-source-lookup` will read. Say the result back to the user in one line, for example
 "Fabric 1.21.1, Yarn mappings, Java 21".

@@ -61,12 +61,24 @@ Claude Code:
 /plugin install mixinsmith@mixinsmith
 ```
 
-Codex, Cursor and other agents: copy `skills/` into your agent's skills folder and point it at `AGENTS.md`.
+Codex, Cursor and other agents: clone this repo and point your agent at `AGENTS.md`. If you copy
+`skills/` somewhere else, fix the paths in `AGENTS.md` to match.
+
+The scripts run on Windows, macOS and Linux. Where `python` is missing, use `python3`.
 
 ## Status
 
-Early. Tested on Fabric 1.21.1 with Yarn, ports checked between 1.20.4, 1.21.1 and 1.21.4. NeoForge
-testing is in progress; a benchmark comes next.
+Early. Tested on Fabric 1.21.1 (Yarn) and NeoForge 1.21.1 (ModDevGradle with Parchment); ports checked
+between 1.20.4, 1.21.1 and 1.21.4. The benchmark harness lives in `bench/`, with no results published yet.
+
+## Development
+
+```
+python -m unittest discover -s tests
+```
+
+The class-file tests compile small Java fixtures and skip themselves when no JDK is on `PATH` or in
+`JAVA_HOME`. CI runs the suite on Windows, macOS and Linux.
 
 ## License
 

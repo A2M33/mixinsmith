@@ -17,7 +17,9 @@ use. If the lookup says the member does not exist, it does not exist in this pro
 
 ## Commands
 
-The script lives next to this file. Run it from the mod project root (or pass `--project <dir>`).
+The script is `scripts/mcsrc.py` in this skill's folder; the paths below are relative to that folder.
+Run it with the mod project root as the working directory, or pass `--project <dir>`. Use `python3`
+where `python` is missing (common on macOS and Linux).
 
 ```
 python scripts/mcsrc.py detect                         # loader, MC version, mappings, Java, jars
@@ -67,5 +69,7 @@ top-level one and lists the others on stderr; pass the full name to pick another
 ## When it cannot find jars
 
 The toolchain creates the named jar on first setup. Run `./gradlew compileJava` (NeoForge) or
-`./gradlew build` (Fabric) once, then retry. The first lookup indexes the jars (a few seconds); later
-lookups read the cache in `.gradle/mixinsmith/`.
+`./gradlew build` (Fabric) once, then retry. On NeoForge the script reads only what ModDevGradle wrote
+to `build/moddev/artifacts/`; if that folder is empty, setup did not finish (often a wrong JDK, see
+`mc-build-loop`). The first lookup indexes the jars (a few seconds); later lookups read the cache in
+`.gradle/mixinsmith/`.

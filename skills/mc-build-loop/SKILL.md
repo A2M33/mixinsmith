@@ -6,7 +6,8 @@ description: Compile, build or boot a Minecraft mod (Fabric or NeoForge) and get
 # Minecraft build loop
 
 Never tell the user a mod change works until this loop passes. Raw Gradle output runs to hundreds of
-lines; the script keeps the parts that matter.
+lines; the script keeps the parts that matter. It is `scripts/mcbuild.py` in this skill's folder; run it
+with the mod project as the working directory or pass `--project <dir>`.
 
 ```
 python scripts/mcbuild.py compile          # compileJava only: run after each edit
@@ -39,6 +40,14 @@ start `./gradlew runClient` and paste the result or the crash file.
 
 ## Java version
 
-Gradle needs a JDK that satisfies both the Gradle plugin and Minecraft. If the log says
-"Dependency requires at least JVM runtime version N", point `JAVA_HOME` at JDK N or newer and retry.
-Minecraft compiles against the toolchain version from `build.gradle`, so a newer JDK running Gradle is fine.
+A `JAVA:` line means Gradle could not start on the current JDK. Gradle needs a JDK that satisfies both
+the Gradle plugin and Gradle itself:
+
+- "JAVA_HOME is not set": no JDK found. Point `JAVA_HOME` at one.
+- "Dependency requires at least JVM runtime version N": the plugin (Fabric Loom 1.19 needs 25)
+  wants JDK N or newer.
+- "Unsupported class file major version N": the JDK is too new for this Gradle version (JDK 25 needs
+  Gradle 9.1 or newer). Use an older JDK, such as 21.
+
+Minecraft compiles against the toolchain version in `build.gradle`, so the JDK that runs Gradle may be
+newer than the one Minecraft targets.
