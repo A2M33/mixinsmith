@@ -18,7 +18,7 @@ try:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # Gradle output on a cp1252 console
 except Exception:
     pass
-task = {"compile": "compileJava", "build": "build"}[sys.argv[1] if len(sys.argv) > 1 else "compile"]
+task = {"compile": "compileJava", "build": "build", "server": "runServer"}[sys.argv[1] if len(sys.argv) > 1 else "compile"]
 root = Path(os.environ.get("BENCH_PROJECT", ".")).resolve()
 env = dict(os.environ)
 java_home = os.environ.get("BENCH_JAVA_HOME")
@@ -29,8 +29,33 @@ if java_home:
     env["PATH"] = str(Path(env["JAVA_HOME"]) / "bin") + os.pathsep + env.get("PATH", "")
 gradlew = [str(root / "gradlew.bat")] if os.name == "nt" else ["sh", str(root / "gradlew")]
 t = time.time()
-p = subprocess.run(gradlew + [task, "--console=plain", "-q"], cwd=root, env=env,
-                   capture_output=True, text=True, encoding="utf-8", errors="replace")
+if task == "runServer":
+    # boot a dedicated server (EULA pre-accepted in run/), stop it once the world has loaded
+    (root / "run").mkdir(exist_ok=True)
+    (root / "run" / "eula.txt").write_text("eula=true\n")
+    proc = subprocess.Popen(gradlew + [task, "--console=plain", "--args=nogui"], cwd=root, env=env,
+                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, encoding="utf-8", errors="replace")
+    lines, loaded = [], False
+    for line in proc.stdout:
+        lines.append(line)
+        if "Done (" in line and "For help" in line:
+            loaded = True
+            proc.stdin.write("stop\n")
+            proc.stdin.flush()
+        if time.time() - t > 600:
+            proc.kill()
+            break
+    proc.wait()
+
+    class P:  # same shape as subprocess.run's result
+        returncode = 0 if loaded else 1
+        stdout = "".join(lines) + ("\nSERVER LOADED AND STOPPED\n" if loaded else "\nSERVER DID NOT LOAD\n")
+        stderr = ""
+    p = P()
+else:
+    p = subprocess.run(gradlew + [task, "--console=plain", "-q"], cwd=root, env=env,
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
 with open(root / "bench-attempts.jsonl", "a", encoding="utf-8") as f:
     f.write(json.dumps({"task": task, "ok": p.returncode == 0, "seconds": round(time.time() - t)}) + "\n")
 (root / "bench-last-build.log").write_text(p.stdout + "\n" + p.stderr, encoding="utf-8")

@@ -72,6 +72,15 @@ def check(task: str, root: Path) -> list[str]:
     elif task == "diamond-xp":
         if "PlayerBlockBreakEvents" not in j or "DIAMOND_ORE" not in j:
             miss.append("event")
+    elif task.startswith("port"):
+        props = (root / "gradle.properties").read_text(encoding="utf-8")
+        if "minecraft_version=1.21.4" not in props:
+            miss.append("not on 1.21.4")
+        # 1.21.4 renders items from item model definitions in assets/<ns>/items/
+        if not find(root, "assets/villagerswarm/items/ruby_block.json"):
+            miss.append("item model definition")
+        if not find(root, "assets/villagerswarm/blockstates/ruby_block.json"):
+            miss.append("blockstate")
     elif task == "zombie-torch":
         if "Goal" not in j or "TORCH" not in j:
             miss.append("goal")
