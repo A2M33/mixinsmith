@@ -148,7 +148,10 @@ def build_table(mc: str) -> dict:
         with gzip.open(path, "rt", encoding="utf-8") as f:
             return json.load(f)
     t_cls, t_mem = parse_tiny(yarn_tiny(mc))
-    p_cls, p_mem = parse_proguard(mojang_txt(mc))
+    try:
+        p_cls, p_mem = parse_proguard(mojang_txt(mc))
+    except LookupError:  # no Mojang mappings before 1.14.4: Yarn and intermediary only
+        p_cls, p_mem = {}, {}
     classes = []
     for off, names in t_cls.items():
         classes.append({"official": off, "intermediary": names.get("intermediary"),

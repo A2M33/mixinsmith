@@ -1,5 +1,7 @@
 # mixinsmith
 
+[![test](https://github.com/A2M33/mixinsmith/actions/workflows/test.yml/badge.svg)](https://github.com/A2M33/mixinsmith/actions/workflows/test.yml)
+
 Your coding agent remembers the Minecraft API of some old version. Your mod targets a different one, so
 the agent writes `damage()` where your mappings say `hurt()`, invents methods that never existed, and you
 burn a build cycle on every guess.
@@ -42,10 +44,11 @@ Targets Fabric (1.14+, Yarn or Mojang mappings) and NeoForge (1.20.2+). Needs Py
 |-------|------|
 | `mc-source-lookup` | `mcsrc.py`: classes, methods, fields, decompiled source, vanilla JSON resources, Mojang/Yarn translation |
 | `mc-build-loop` | `mcbuild.py`: compile, build, boot a dedicated server, summarize crash reports |
+| `mc-port-version` | `mcport.py`: every class and member a version bump renames or removes, where your mod uses it, import rewrites |
 | `mc-project-detect` | loader, Minecraft version, mappings and Java version of the project |
 | `mc-mixins`, `mc-blocks-items`, `mc-entities` | how to build each kind of feature for the version you are on |
 | agents | `mod-designer`, `mixin-specialist`, `entity-specialist`, `asset-builder`, `mod-reviewer` |
-| commands | `/new-mod`, `/fix-crash` |
+| commands | `/new-mod`, `/fix-crash`, `/port-version` |
 
 ## Install
 
@@ -60,8 +63,8 @@ Codex, Cursor and other agents: copy `skills/` into your agent's skills folder a
 
 ## Status
 
-Early. Tested on Fabric 1.21.1 with Yarn. NeoForge testing is in progress; version porting
-(`/port-version`) and a benchmark come next.
+Early. Tested on Fabric 1.21.1 with Yarn, ports checked between 1.20.4, 1.21.1 and 1.21.4. NeoForge
+testing is in progress; a benchmark comes next.
 
 ## License
 

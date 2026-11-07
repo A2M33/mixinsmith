@@ -170,6 +170,36 @@ class MappingsTests(unittest.TestCase):
         self.assertTrue(mappings.cached("9.9"))
 
 
+class PortTests(unittest.TestCase):
+    def table(self, entity_cls: str, method: str) -> dict:
+        return {"classes": [
+            {"official": "a", "intermediary": "net/minecraft/class_1", "yarn": entity_cls, "mojang": None},
+            {"official": "b", "intermediary": "net/minecraft/class_2", "yarn": "net/minecraft/Gone", "mojang": None},
+        ], "members": [
+            {"owner": "a", "kind": "m", "official": "x", "intermediary": "method_1", "yarn": method, "mojang": None},
+            {"owner": "a", "kind": "m", "official": "y", "intermediary": "method_2", "yarn": "get", "mojang": None},
+        ]}
+
+    def test_rename_and_scan(self):
+        sys.path.insert(0, str(ROOT / "skills/mc-port-version/scripts"))
+        import mcport
+        old = self.table("net/minecraft/old/Dir", "asRotation")
+        new = self.table("net/minecraft/util/Dir", "getDegrees")
+        new["classes"].pop()  # Gone removed
+        d = mcport.diff(old, new, "yarn")
+        self.assertEqual(d["classes"], {"net/minecraft/old/Dir": "net/minecraft/util/Dir"})
+        self.assertEqual(d["members"], {"asRotation": {("getDegrees", "net/minecraft/util/Dir")}})
+        self.assertIn("net/minecraft/Gone", d["removed_classes"])
+
+        src = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, src, True)
+        (src / "A.java").write_text("import net.minecraft.old.Dir;\nclass A { float f(Dir d) { return d.asRotation(); } }\n",
+                                    encoding="utf-8")
+        mcport.scan.hidden = 0
+        self.assertGreater(mcport.scan(src, d, apply_imports=True), 0)
+        self.assertIn("import net.minecraft.util.Dir;", (src / "A.java").read_text(encoding="utf-8"))
+
+
 class DetectTests(unittest.TestCase):
     def project(self, files: dict[str, str]) -> Path:
         d = Path(tempfile.mkdtemp())
