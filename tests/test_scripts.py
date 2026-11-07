@@ -111,6 +111,25 @@ class ClassFileTests(unittest.TestCase):
         chain = mcsrc.supers(self.idx, "net/minecraft/entity/LivingEntity")
         self.assertEqual(chain[:2], ["net/minecraft/entity/LivingEntity", "net/minecraft/entity/Entity"])
 
+    def test_parameter_names_from_debug_info(self):
+        # NeoForge jars carry Parchment names only in the LocalVariableTable, not in MethodParameters
+        src = self.tmp / "lvt" / "Lvt.java"
+        src.parent.mkdir(parents=True)
+        src.write_text("public class Lvt {\n"
+                       "  public boolean hurt(Object source, float amount) { return amount > 0; }\n"
+                       "  public static void tick(long time, int[] counts, double scale) {}\n"
+                       "  public abstract static class A { public abstract void run(int speed); }\n"
+                       "}\n", encoding="utf-8")
+        subprocess.run([javac(), "-g", "-d", str(src.parent), str(src)], check=True, capture_output=True)
+        cls = mcsrc.parse_class((src.parent / "Lvt.class").read_bytes())
+        by_name = {m[1]: m for m in cls["methods"]}
+        self.assertEqual(mcsrc.fmt_method("Lvt", by_name["hurt"]), "public boolean hurt(Object source, float amount)")
+        self.assertEqual(mcsrc.fmt_method("Lvt", by_name["tick"]),
+                         "public static void tick(long time, int[] counts, double scale)")
+        inner = mcsrc.parse_class((src.parent / "Lvt$A.class").read_bytes())
+        run = next(m for m in inner["methods"] if m[1] == "run")
+        self.assertEqual(mcsrc.fmt_method("Lvt$A", run), "public abstract void run(int)")  # no body, no names
+
     def test_resources(self):
         with zipfile.ZipFile(self.jar) as z:
             self.assertIn("data/minecraft/recipe/stick.json", z.namelist())
@@ -231,6 +250,65 @@ class DetectTests(unittest.TestCase):
         self.assertEqual((info["loader"], info["plugin"], info["mappings"]),
                          ("neoforge", "moddevgradle", "mojang+parchment"))
 
+    def test_fabric_mojang_kotlin_dsl(self):
+        d = self.project({
+            "build.gradle.kts": "plugins { id(\"fabric-loom\") version \"1.9\" }\n"
+                                "dependencies { mappings(loom.officialMojangMappings()) }\n"
+                                "tasks.withType<JavaCompile> { options.release.set(17) }",
+            "gradle.properties": "minecraft_version=1.20.1",
+        })
+        info = mcsrc.detect(d)
+        self.assertEqual((info["loader"], info["mappings"], info["java"]), ("fabric", "mojang", 17))
+
+    def test_fabric_unobfuscated_has_no_mappings_line(self):
+        d = self.project({
+            "build.gradle": "plugins { id 'net.fabricmc.fabric-loom' version '1.14' }\n"
+                            "dependencies { minecraft \"com.mojang:minecraft:26.1\" }\n"
+                            "java { sourceCompatibility = JavaVersion.VERSION_25 }",
+            "gradle.properties": "minecraft_version=26.1",
+        })
+        info = mcsrc.detect(d)
+        self.assertEqual((info["mappings"], info["java"]), ("mojang", 25))
+
+
+class JarDiscoveryTests(unittest.TestCase):
+    def test_version_in_jar_name_is_exact(self):
+        name = "minecraft-merged-e69-1.21.1-net.fabricmc.yarn.1_21_1.1.21.1+build.3-v2.jar"
+        self.assertTrue(mcsrc._is_version(name, "1.21.1"))
+        self.assertFalse(mcsrc._is_version(name, "1.21"))
+        self.assertTrue(mcsrc._is_version("minecraft-common-1.21.jar", "1.21"))
+
+    def test_neoforge_moddev_artifacts(self):
+        d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, d, True)
+        info = {"loader": "neoforge", "loader_version": "21.1.265", "minecraft_version": "1.21.1"}
+        self.assertEqual(mcsrc.find_jars(d, info)["minecraft"], [])  # not set up: never guess elsewhere
+        art = d / "build/moddev/artifacts"
+        art.mkdir(parents=True)
+        for suffix in ("", "-merged", "-sources", "-client-extra-aka-minecraft-resources"):
+            (art / f"neoforge-21.1.265{suffix}.jar").write_bytes(b"")
+        jars = mcsrc.find_jars(d, info)
+        self.assertEqual([Path(j).name for j in jars["minecraft"]], ["neoforge-21.1.265.jar"])
+        self.assertEqual([Path(j).name for j in jars["resources"]],
+                         ["neoforge-21.1.265-client-extra-aka-minecraft-resources.jar"])
+        self.assertEqual(Path(mcsrc.sources_for(jars["minecraft"][0])).name, "neoforge-21.1.265-sources.jar")
+
+
+class HierarchyFilterTests(unittest.TestCase):
+    ROWS = [
+        {"kind": "m", "mojang": "hurt", "owner_mojang": "net/minecraft/world/entity/Entity"},
+        {"kind": "m", "mojang": "hurt", "owner_mojang": "net/minecraft/world/item/ItemStack"},
+    ]
+
+    def test_keeps_members_of_the_class_and_its_supertypes(self):
+        owners = ["net/minecraft/world/entity/LivingEntity", "net/minecraft/world/entity/Entity"]
+        rows = mcsrc.in_hierarchy(self.ROWS, "mojang", owners)
+        self.assertEqual([r["owner_mojang"] for r in rows], ["net/minecraft/world/entity/Entity"])
+
+    def test_unrelated_hierarchy_keeps_everything(self):
+        self.assertEqual(mcsrc.in_hierarchy(self.ROWS, "mojang", ["a/B"]), self.ROWS)
+        self.assertEqual(mcsrc.in_hierarchy(self.ROWS, "mojang", None), self.ROWS)
+
 
 class DiagnoseTests(unittest.TestCase):
     def test_javac_errors_windows_paths_deduped(self):
@@ -277,7 +355,6 @@ class DiagnoseTests(unittest.TestCase):
                             ("net.neoforged.gradle.userdev", "runs/server")):
             (d / "build.gradle").write_text(f"plugins {{ id '{plugin}' }}", encoding="utf-8")
             self.assertEqual(mcbuild.server_dir(d), d / run, plugin)
-
 
 
 if __name__ == "__main__":

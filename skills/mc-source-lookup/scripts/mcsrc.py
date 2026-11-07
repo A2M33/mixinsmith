@@ -31,7 +31,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))  # sibling mappings.py
 
-INDEX_VERSION = 1
+INDEX_VERSION = 2
 
 # ---------------------------------------------------------------- detection
 
@@ -84,6 +84,9 @@ def detect(root: Path) -> dict:
         elif re.search(r"yarn", build):
             info["mappings"] = "yarn"
             info["yarn"] = props.get("yarn_mappings")
+        elif not re.search(r"^\s*mappings\b", build, re.M):
+            # no mappings dependency at all: an unobfuscated Minecraft (26.1+), named by Mojang
+            info["mappings"] = "mojang"
         else:
             info["mappings"] = "unknown"
     elif re.search(r"net\.neoforged\.moddev", text):
@@ -102,9 +105,9 @@ def detect(root: Path) -> dict:
         info["mappings"] = "mojang+parchment" if "parchment" in build else "mojang"
 
     info["minecraft_version"] = props.get("minecraft_version")
-    m = re.search(r"languageVersion\s*=\s*JavaLanguageVersion\.of\((\d+)\)", build) or re.search(
-        r"release\s*=\s*(\d+)", build
-    )
+    m = (re.search(r"languageVersion(?:\s*=\s*|\.set\(\s*)JavaLanguageVersion\.of\((\d+)\)", build)
+         or re.search(r"release(?:\s*=\s*|\.set\(\s*)(\d+)", build)
+         or re.search(r"JavaVersion\.VERSION_(?:1_)?(\d+)", build))
     info["java"] = int(m.group(1)) if m else None
     return info
 
@@ -116,11 +119,16 @@ def _newest(paths: list[str]) -> list[str]:
     return sorted(set(paths), key=lambda p: os.path.getmtime(p), reverse=True)
 
 
+def _is_version(base: str, mc: str) -> bool:
+    """True if a jar file name carries exactly this Minecraft version ('1.21' must not match '1.21.1')."""
+    return mc == "*" or re.search(rf"-{re.escape(mc)}(?:-|\.jar$)", base) is not None
+
+
 def find_jars(root: Path, info: dict) -> dict[str, list[str]]:
-    """Return {'minecraft': [...], 'api': [...]} of named class jars."""
+    """Return {'minecraft': [...], 'api': [...]} of named class jars, plus 'resources' jars without classes."""
     mc = info.get("minecraft_version") or "*"
     home = Path.home() / ".gradle" / "caches"
-    out: dict[str, list[str]] = {"minecraft": [], "api": []}
+    out: dict[str, list[str]] = {"minecraft": [], "api": [], "resources": []}
 
     if info["loader"] == "fabric":
         pats = [
@@ -134,7 +142,7 @@ def find_jars(root: Path, info: dict) -> dict[str, list[str]]:
             c for c in cands
             if "intermediary" not in os.path.basename(c)
             and not c.endswith("-sources.jar")
-            and (mc == "*" or f"-{mc}" in os.path.basename(c))
+            and _is_version(os.path.basename(c), mc)
         ]
         # project-local cache first: it matches the project's exact mappings
         local = [c for c in cands if str(root) in c]
@@ -142,12 +150,18 @@ def find_jars(root: Path, info: dict) -> dict[str, list[str]]:
         api = glob.glob(str(root / ".gradle/loom-cache/remapped_mods/**/*.jar"), recursive=True)
         out["api"] = sorted(a for a in api if not a.endswith("-sources.jar"))
     elif info["loader"] == "neoforge":
+        # ModDevGradle writes neoforge-<v>.jar (vanilla + NeoForge classes), -sources.jar, -merged.jar
+        # (the same classes plus resources) and -client-extra-aka-minecraft-resources.jar (vanilla
+        # assets and data, no classes). The global neoformruntime cache only holds intermediate,
+        # partly obfuscated jars, so it is never searched.
         cands = glob.glob(str(root / "build/moddev/artifacts/*.jar"))
         cands += glob.glob(str(root / "build/neoForm/**/*.jar"), recursive=True)
-        cands += glob.glob(str(home / "neoformruntime/**/*.jar"), recursive=True) if not cands else []
-        cands = [c for c in cands if not c.endswith("-sources.jar")]
-        # the merged neoforge jar holds vanilla + NeoForge classes together
-        out["minecraft"] = _newest(cands)[:1]
+        out["resources"] = sorted(c for c in cands if "-client-extra" in os.path.basename(c))
+        cands = [c for c in cands if not c.endswith("-sources.jar") and c not in out["resources"]]
+        want = f"neoforge-{info.get('loader_version')}.jar"
+        exact = [c for c in cands if os.path.basename(c) == want]
+        plain = [c for c in cands if not c.endswith("-merged.jar")]
+        out["minecraft"] = exact[:1] or _newest(plain)[:1] or _newest(cands)[:1]
     return out
 
 
@@ -168,6 +182,41 @@ ACC = {
 }
 PRIMS = {"B": "byte", "C": "char", "D": "double", "F": "float", "I": "int",
          "J": "long", "S": "short", "Z": "boolean", "V": "void"}
+
+
+def lvt_params(code: bytes, acc: int, desc: str, utf8: dict[int, str]) -> list[str] | None:
+    """Parameter names from a Code attribute's LocalVariableTable.
+
+    NeoForge recompiles Minecraft with Parchment names in the debug info but writes no
+    MethodParameters attribute, so this is where its parameter names live.
+    """
+    if not desc.startswith("("):
+        return None
+    slots, slot = [], 0 if acc & 0x0008 else 1
+    for t in re.findall(r"\[*(?:L[^;]+;|[BCDFIJSZ])", desc[1:desc.index(")")]):
+        slots.append(slot)
+        slot += 2 if t in ("J", "D") else 1
+    if not slots:
+        return None
+    (code_len,) = struct.unpack_from(">I", code, 4)
+    p = 8 + code_len
+    (n_exc,) = struct.unpack_from(">H", code, p)
+    p += 2 + 8 * n_exc
+    (n_attr,) = struct.unpack_from(">H", code, p)
+    p += 2
+    for _ in range(n_attr):
+        ai, al = struct.unpack_from(">HI", code, p)
+        if utf8.get(ai) == "LocalVariableTable":
+            (n,) = struct.unpack_from(">H", code, p + 6)
+            names = {}
+            for j in range(n):
+                start, _, name_i, _, index = struct.unpack_from(">HHHHH", code, p + 8 + j * 10)
+                if start == 0:
+                    names[index] = utf8.get(name_i, "")
+            found = [names.get(s) for s in slots]
+            return found if all(found) else None
+        p += 6 + al
+    return None
 
 
 def parse_class(data: bytes) -> dict | None:
@@ -231,6 +280,8 @@ def parse_class(data: bytes) -> dict | None:
                 elif aname == "MethodParameters":
                     k = body[0]
                     params = [utf8.get(struct.unpack_from(">H", body, 1 + j * 4)[0], "") for j in range(k)]
+                elif aname == "Code" and params is None:
+                    params = lvt_params(body, acc, utf8.get(di) or "", utf8)
                 pos += 6 + al
             res.append([acc, utf8.get(ni), utf8.get(di), sig, params])
         return res
@@ -543,7 +594,8 @@ def cmd_method(idx: dict, args) -> None:
         if found:
             break  # nearest declaration wins; overrides higher up are noise
     if not found:
-        names = {m[1] for o in supers(idx, cn) for m in idx["classes"][o]["methods"] if not m[1].startswith("<")}
+        names = {m[1] for o in supers(idx, cn) for m in idx["classes"][o]["methods"]
+                 if not m[1].startswith("<") and not m[0] & 0x1040}  # skip lambda$ and bridges
         near = sorted(n for n in names if mname.lower() in n.lower())
         near += [n for n in difflib.get_close_matches(mname, names, n=6, cutoff=0.6) if n not in near]
         msg = f"mcsrc: {simple(cn)} has no method '{mname}' (searched the class and its supertypes)."
@@ -631,6 +683,18 @@ def project_ns(info: dict) -> str:
     return "yarn" if info.get("mappings") == "yarn" else "mojang"
 
 
+def in_hierarchy(rows: list[dict], ns: str, owners: list[str] | None) -> list[dict]:
+    """Keep members declared in the queried class or its supertypes (names in the project's mappings).
+
+    mappings.translate falls back to every class with a member of that name when the queried class
+    does not declare it; the project's own class hierarchy narrows that back down.
+    """
+    if not owners:
+        return rows
+    keep = [r for r in rows if r.get("kind") == "class" or r.get("owner_" + ns) in owners]
+    return keep or rows
+
+
 def translation_hint(info: dict, spec: str, owners: list[str] | None = None) -> str:
     """One line naming the member in this project's mappings, if the table is already cached."""
     mc = info.get("minecraft_version")
@@ -644,19 +708,31 @@ def translation_hint(info: dict, spec: str, owners: list[str] | None = None) -> 
     except Exception:
         return ""
     ns = project_ns(info)
-    if owners and ns == "yarn":  # the project jar is yarn-named: keep the class and its supertypes
-        rows = [r for r in rows if r.get("owner_yarn") in owners] or rows
+    rows = in_hierarchy(rows, ns, owners)
     names = sorted({f"{simple(r['owner_' + ns])}#{r[ns]}" for r in rows if r.get(ns)})
     if not names:
         return ""
     return f"\nIn {ns} mappings (this project) that name is: " + ", ".join(names[:6])
 
 
-def cmd_translate(info: dict, args) -> None:
+def project_hierarchy(table: dict, query: str, ns: str, root: Path, jars: dict) -> list[str]:
+    """Supertypes (project names) of the class in 'Class#member', read from the project's jars."""
+    import mappings
+    cls_q = query.partition("#")[0] if "#" in query else ""
+    if not cls_q or not jars["minecraft"]:
+        return []
+    idx = load_index(root, jars["minecraft"] + jars["api"])
+    owners: list[str] = []
+    for r in mappings.translate(table, cls_q):
+        if r.get(ns) in idx["classes"]:
+            owners += supers(idx, r[ns])
+    return owners
+
+
+def cmd_translate(info: dict, args, root: Path, jars: dict) -> None:
     mc = info.get("minecraft_version")
     if not mc:
         sys.exit("mcsrc: unknown Minecraft version; cannot pick mappings")
-    sys.path.insert(0, str(Path(__file__).parent))
     import mappings
     if not mappings.cached(mc):
         print(f"# building the Mojang/Yarn table for {mc} (one-time download)", file=sys.stderr)
@@ -668,6 +744,7 @@ def cmd_translate(info: dict, args) -> None:
     if not rows:
         sys.exit(f"mcsrc: '{args.query}' is not a name in Mojang, Yarn or intermediary for {mc}")
     ns = project_ns(info)
+    rows = in_hierarchy(rows, ns, project_hierarchy(table, args.query, ns, root, jars))
     print(f"# this project uses {ns} names")
     for r in rows[:args.limit]:
         if r["kind"] == "class":
@@ -681,10 +758,12 @@ def cmd_translate(info: dict, args) -> None:
 def cmd_files(jars: list[str], args) -> None:
     rx = re.compile(args.pattern, re.I)
     n = 0
+    seen: set[str] = set()  # NeoForge ships some vanilla data in two jars
     for jar in jars:
         with zipfile.ZipFile(jar) as z:
             for name in z.namelist():
-                if not name.endswith(("/", ".class")) and rx.search(name):
+                if not name.endswith(("/", ".class")) and rx.search(name) and name not in seen:
+                    seen.add(name)
                     print(name)
                     n += 1
                     if n >= args.limit:
@@ -749,7 +828,7 @@ def main() -> None:
     jars = find_jars(root, info)
     args.info = info
     if args.cmd == "translate":
-        cmd_translate(info, args)
+        cmd_translate(info, args, root, jars)
         return
 
     if args.cmd == "detect":
@@ -763,7 +842,7 @@ def main() -> None:
         sys.exit(f"mcsrc: no named Minecraft jar found for {info['loader']} {info.get('minecraft_version')}. "
                  f"Run `{task}` once so the toolchain sets up Minecraft, then retry.")
     if args.cmd in ("files", "cat"):
-        all_jars = jars["minecraft"] + jars["api"]
+        all_jars = jars["minecraft"] + jars["resources"] + jars["api"]
         (cmd_files if args.cmd == "files" else cmd_cat)(all_jars, args)
         return
     idx = load_index(root, jars["minecraft"] + jars["api"])
