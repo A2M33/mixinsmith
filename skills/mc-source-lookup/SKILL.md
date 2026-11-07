@@ -31,6 +31,22 @@ python scripts/mcsrc.py files 'diamond_sword'          # resource paths (assets/
 python scripts/mcsrc.py cat data/minecraft/recipe/diamond_sword.json  # vanilla JSON for this version
 ```
 
+## Code written for other mappings
+
+Tutorials, other mods and your memory mix Yarn names (`damage`, `Identifier`, `getWorld`) with Mojang
+names (`hurt`, `ResourceLocation`, `level`). Translate instead of guessing:
+
+```
+python scripts/mcsrc.py translate LivingEntity#hurt   # -> yarn Entity#damage, mojang Entity#hurt
+python scripts/mcsrc.py translate ResourceLocation    # -> yarn Identifier
+```
+
+The first call per Minecraft version downloads Mojang's and Yarn's mappings into
+`~/.cache/mixinsmith/` (a few seconds). After that, `method` and `field` add the project's name to
+their "not found" message on their own.
+
+## Resources
+
 Model, blockstate, recipe, loot table and tag formats change between versions too. Copy the vanilla
 file from `cat` instead of writing JSON from memory.
 

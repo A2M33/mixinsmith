@@ -13,6 +13,7 @@ Java syntax plus the descriptor string a mixin needs. No decompiler, no deps.
     mcsrc.py source LivingEntity#damage
     mcsrc.py files 'diamond_sword'
     mcsrc.py cat data/minecraft/recipe/diamond_sword.json
+    mcsrc.py translate LivingEntity#hurt     # Mojang <-> Yarn <-> intermediary
 """
 from __future__ import annotations
 
@@ -27,6 +28,8 @@ import struct
 import sys
 import zipfile
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # sibling mappings.py
 
 INDEX_VERSION = 1
 
@@ -546,7 +549,7 @@ def cmd_method(idx: dict, args) -> None:
         msg = f"mcsrc: {simple(cn)} has no method '{mname}' (searched the class and its supertypes)."
         if near:
             msg += " Similar: " + ", ".join(near[:12])
-        sys.exit(msg)
+        sys.exit(msg + translation_hint(args.info, args.spec, supers(idx, cn)))
 
 
 def cmd_field(idx: dict, args) -> None:
@@ -561,7 +564,8 @@ def cmd_field(idx: dict, args) -> None:
                 return
     near = sorted({f[1] for o in supers(idx, cn) for f in idx["classes"][o]["fields"]
                    if fname.lower() in f[1].lower()})
-    sys.exit(f"mcsrc: {simple(cn)} has no field '{fname}'." + (" Similar: " + ", ".join(near[:12]) if near else ""))
+    sys.exit(f"mcsrc: {simple(cn)} has no field '{fname}'." + (" Similar: " + ", ".join(near[:12]) if near else "")
+             + translation_hint(args.info, args.spec, supers(idx, cn)))
 
 
 def cmd_search(idx: dict, args) -> None:
@@ -623,6 +627,57 @@ def cmd_source(idx: dict, args) -> None:
         sys.exit(f"mcsrc: '{mname}' not found in {outer}")
 
 
+def project_ns(info: dict) -> str:
+    return "yarn" if info.get("mappings") == "yarn" else "mojang"
+
+
+def translation_hint(info: dict, spec: str, owners: list[str] | None = None) -> str:
+    """One line naming the member in this project's mappings, if the table is already cached."""
+    mc = info.get("minecraft_version")
+    if not mc:
+        return ""
+    try:
+        import mappings
+        if not mappings.cached(mc):
+            return f"\nIf '{spec.split('#')[-1]}' is a name from other mappings, run: mcsrc.py translate {spec}"
+        rows = mappings.translate(mappings.build_table(mc), spec)
+    except Exception:
+        return ""
+    ns = project_ns(info)
+    if owners and ns == "yarn":  # the project jar is yarn-named: keep the class and its supertypes
+        rows = [r for r in rows if r.get("owner_yarn") in owners] or rows
+    names = sorted({f"{simple(r['owner_' + ns])}#{r[ns]}" for r in rows if r.get(ns)})
+    if not names:
+        return ""
+    return f"\nIn {ns} mappings (this project) that name is: " + ", ".join(names[:6])
+
+
+def cmd_translate(info: dict, args) -> None:
+    mc = info.get("minecraft_version")
+    if not mc:
+        sys.exit("mcsrc: unknown Minecraft version; cannot pick mappings")
+    sys.path.insert(0, str(Path(__file__).parent))
+    import mappings
+    if not mappings.cached(mc):
+        print(f"# building the Mojang/Yarn table for {mc} (one-time download)", file=sys.stderr)
+    try:
+        table = mappings.build_table(mc)
+    except Exception as e:
+        sys.exit(f"mcsrc: could not load mappings for {mc}: {e}")
+    rows = mappings.translate(table, args.query)
+    if not rows:
+        sys.exit(f"mcsrc: '{args.query}' is not a name in Mojang, Yarn or intermediary for {mc}")
+    ns = project_ns(info)
+    print(f"# this project uses {ns} names")
+    for r in rows[:args.limit]:
+        if r["kind"] == "class":
+            print(f"class  yarn: {r['yarn']}  mojang: {r['mojang']}  intermediary: {r['intermediary']}")
+        else:
+            kind = "method" if r["kind"] == "m" else "field"
+            print(f"{kind}  yarn: {simple(r['owner_yarn'])}#{r['yarn']}  "
+                  f"mojang: {simple(r['owner_mojang'])}#{r['mojang']}  intermediary: {r['intermediary']}")
+
+
 def cmd_files(jars: list[str], args) -> None:
     rx = re.compile(args.pattern, re.I)
     n = 0
@@ -678,6 +733,9 @@ def main() -> None:
     p = sub.add_parser("files", help="regex over resource paths (assets/, data/) in the jars")
     p.add_argument("pattern")
     p.add_argument("--limit", type=int, default=60)
+    p = sub.add_parser("translate", help="same class/member in Mojang, Yarn and intermediary names")
+    p.add_argument("query", help="Class, Class#member or member, in any mappings")
+    p.add_argument("--limit", type=int, default=20)
     p = sub.add_parser("cat", help="print a resource file, e.g. data/minecraft/recipe/diamond_sword.json")
     p.add_argument("path")
     args = ap.parse_args()
@@ -689,6 +747,10 @@ def main() -> None:
     root = find_root(Path(args.project).resolve())
     info = detect(root)
     jars = find_jars(root, info)
+    args.info = info
+    if args.cmd == "translate":
+        cmd_translate(info, args)
+        return
 
     if args.cmd == "detect":
         info["jars"] = {k: v[:3] + ([f"... {len(v) - 3} more"] if len(v) > 3 else []) for k, v in jars.items()}
