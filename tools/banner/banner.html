@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>mixinsmith banner</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="banner.css">
+</head>
+<body>
+<main class="sheet">
+  <div class="top">
+    <header class="head">
+      <img class="icon" src="icon.png" width="104" height="104" alt="">
+      <div>
+        <h1>mixinsmith</h1>
+        <p class="sub">Skills for coding agents that write Minecraft mods. Every method name comes from the jars your project builds against, not from memory.</p>
+      </div>
+    </header>
+
+    <section class="console" aria-label="Terminal">
+      <div class="run">
+        <p class="cmd">$ python mcsrc.py method LivingEntity#damage</p>
+        <p class="tag">Fabric 1.21.1, Yarn</p>
+      </div>
+      <p class="out">public boolean damage(DamageSource source, float amount)</p>
+      <p class="out dim">  mixin target: damage(Lnet/minecraft/entity/damage/DamageSource;F)Z</p>
+
+      <div class="run">
+        <p class="cmd">$ python mcsrc.py method LivingEntity#hurt</p>
+        <p class="tag">NeoForge 1.21.1, Parchment</p>
+      </div>
+      <p class="out">public boolean hurt(DamageSource source, float amount)</p>
+      <p class="out dim">  mixin target: hurt(Lnet/minecraft/world/damagesource/DamageSource;F)Z</p>
+    </section>
+  </div>
+
+  <section class="readings">
+    <div class="cell">
+      <p class="reading">1.14+</p>
+      <p class="tag">Fabric, Yarn or Mojang mappings</p>
+    </div>
+    <div class="cell">
+      <p class="reading">1.20.2+</p>
+      <p class="tag">NeoForge</p>
+    </div>
+    <div class="cell">
+      <p class="reading">1.21.1</p>
+      <p class="tag">Tested on both loaders</p>
+    </div>
+    <div class="cell">
+      <p class="reading">3.9+</p>
+      <p class="tag">Python, nothing else to install</p>
+    </div>
+  </section>
+</main>
+</body>
+</html>

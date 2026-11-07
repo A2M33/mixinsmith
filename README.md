@@ -1,3 +1,5 @@
+![mixinsmith banner: the icon and name, then two real lookups. In a Fabric 1.21.1 Yarn project, mcsrc.py method LivingEntity#damage prints public boolean damage(DamageSource source, float amount) with its mixin target; in a NeoForge 1.21.1 Parchment project, LivingEntity#hurt prints the same method under the name hurt. Four facts below: Fabric 1.14+ with Yarn or Mojang mappings, NeoForge 1.20.2+, tested on 1.21.1 with both loaders, and Python 3.9+ with nothing else to install.](assets/banner.png)
+
 # mixinsmith
 
 [![test](https://github.com/A2M33/mixinsmith/actions/workflows/test.yml/badge.svg)](https://github.com/A2M33/mixinsmith/actions/workflows/test.yml)
