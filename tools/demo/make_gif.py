@@ -1,7 +1,7 @@
 """Render assets/demo.gif from real captured outputs (captures/*.txt), in the A2M33 palette.
 
 The captures come from a Fabric 1.21.1 (Yarn) test mod with a mixin aimed at the Mojang name `hurt`.
-Windows only as written (Consolas from C:/Windows/Fonts).
+Fonts come from tools/banner/fonts (needs a Pillow built with WOFF2 support).
 
     pip install pillow
     python tools/demo/make_gif.py
@@ -15,21 +15,22 @@ HERE = Path(__file__).resolve().parent
 CAPTURES = HERE / "captures"
 OUT = HERE.parent.parent / "assets" / "demo.gif"
 
-MONO = ImageFont.truetype("C:/Windows/Fonts/consola.ttf", 15)
-MONO_BOLD = ImageFont.truetype("C:/Windows/Fonts/consolab.ttf", 15)
-LABEL = ImageFont.truetype(str(HERE.parent / "banner" / "fonts" / "Barlow-Medium.woff2"), 16)
+FONTS = HERE.parent / "banner" / "fonts"
+MONO = ImageFont.truetype(str(FONTS / "JetBrainsMono-400.woff2"), 14)
+MONO_BOLD = ImageFont.truetype(str(FONTS / "JetBrainsMono-500.woff2"), 14)
+LABEL = ImageFont.truetype(str(FONTS / "Archivo-500.woff2"), 16)
 
-# Light values from tokens.css
-CAB = (0xE3, 0xE5, 0xE0)
-PANEL = (0xF4, 0xF5, 0xF2)
-INSET = (0xD5, 0xD9, 0xD3)
-LINE = (0xB9, 0xBF, 0xB7)
-INK = (0x1D, 0x24, 0x20)
-INK_2 = (0x56, 0x60, 0x5A)
-AMBER = (0xD9, 0x92, 0x11)
-AMBER_INK = (0x6B, 0x46, 0x00)
-FAULT = (0xB8, 0x32, 0x2A)
-OK = (0x3D, 0x7A, 0x4F)
+# Dark values from tokens.css (A2M33 "trace"); AMBER is the signal colour, cyan since the redesign
+CAB = (0x0B, 0x12, 0x22)
+PANEL = (0x11, 0x1A, 0x2D)
+INSET = (0x18, 0x23, 0x3A)
+LINE = (0x22, 0x30, 0x4B)
+INK = (0xE6, 0xED, 0xF7)
+INK_2 = (0x93, 0xA3, 0xBD)
+AMBER = (0x2F, 0xCB, 0xEA)
+AMBER_INK = (0x7F, 0xE0, 0xF3)
+FAULT = (0xFF, 0x6B, 0x6B)
+OK = (0x3F, 0xCF, 0x93)
 
 W, COLS, LH = 980, 104, 21
 ROWS = 22

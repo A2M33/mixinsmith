@@ -1,8 +1,8 @@
-![mixinsmith banner: the icon and name, then two real lookups. In a Fabric 1.21.1 Yarn project, mcsrc.py method LivingEntity#damage prints public boolean damage(DamageSource source, float amount) with its mixin target; in a NeoForge 1.21.1 Parchment project, LivingEntity#hurt prints the same method under the name hurt. Four facts below: Fabric 1.14+ with Yarn or Mojang mappings, NeoForge 1.20.2+, tested on 1.21.1 with both loaders, and Python 3.9+ with nothing else to install.](assets/banner.png)
+![mixinsmith banner: two real lookups in a terminal. In a NeoForge 1.21.1 Parchment project, mcsrc.py method LivingEntity#hurt prints public boolean hurt(DamageSource source, float amount); in a Fabric 1.21.1 Yarn project, LivingEntity#damage prints the same method as damage, with its mixin target. A callout on that line says the descriptor is read from the jars Gradle already downloaded.](assets/banner.png)
 
 # mixinsmith
 
-[![test](https://github.com/A2M33/mixinsmith/actions/workflows/test.yml/badge.svg)](https://github.com/A2M33/mixinsmith/actions/workflows/test.yml)
+[![test](https://img.shields.io/github/actions/workflow/status/A2M33/mixinsmith/test.yml?label=test&style=flat-square&labelColor=111a2d&color=22304b)](https://github.com/A2M33/mixinsmith/actions/workflows/test.yml)
 
 Your coding agent remembers the Minecraft API of some old version. Your mod targets a different one, so
 the agent writes `damage()` where your mappings say `hurt()`, invents methods that never existed, and you

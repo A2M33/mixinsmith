@@ -5,53 +5,49 @@
 <title>mixinsmith banner</title>
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="banner.css">
+<script src="trace.js"></script>
+<style>
+  .term { position: absolute; left: 520px; top: 104px; width: 688px; padding: 0 0 22px;
+          background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-panel);
+          font: 400 14px/1.75 var(--font-code); color: var(--ink); }
+  .term header { display: flex; align-items: center; gap: 10px; padding: 12px 22px; border-bottom: 1px solid var(--line);
+                 font: 500 15px/1 var(--font); color: var(--ink-2); margin-bottom: 14px; }
+  .term p { margin: 0 22px; white-space: pre; }
+  .term .cmd { font-weight: 500; }
+  .term .ctx { float: right; font: 400 13px/24px var(--font); color: var(--ink-2); }
+  .term .dim { color: var(--ink-2); }
+  .term .hit { color: var(--signal-ink); }
+  .term .gap { height: 14px; }
+</style>
 </head>
 <body>
 <main class="sheet">
-  <div class="top">
-    <header class="head">
-      <img class="icon" src="icon.png" width="104" height="104" alt="">
-      <div>
-        <h1>mixinsmith</h1>
-        <p class="sub">Skills for coding agents that write Minecraft mods. Every method name comes from the jars your project builds against, not from memory.</p>
-      </div>
-    </header>
-
-    <section class="console" aria-label="Terminal">
-      <div class="run">
-        <p class="cmd">$ python mcsrc.py method LivingEntity#damage</p>
-        <p class="tag">Fabric 1.21.1, Yarn</p>
-      </div>
-      <p class="out">public boolean damage(DamageSource source, float amount)</p>
-      <p class="out dim">  mixin target: damage(Lnet/minecraft/entity/damage/DamageSource;F)Z</p>
-
-      <div class="run">
-        <p class="cmd">$ python mcsrc.py method LivingEntity#hurt</p>
-        <p class="tag">NeoForge 1.21.1, Parchment</p>
-      </div>
-      <p class="out">public boolean hurt(DamageSource source, float amount)</p>
-      <p class="out dim">  mixin target: hurt(Lnet/minecraft/world/damagesource/DamageSource;F)Z</p>
-    </section>
-  </div>
-
-  <section class="readings">
-    <div class="cell">
-      <p class="reading">1.14+</p>
-      <p class="tag">Fabric, Yarn or Mojang mappings</p>
-    </div>
-    <div class="cell">
-      <p class="reading">1.20.2+</p>
-      <p class="tag">NeoForge</p>
-    </div>
-    <div class="cell">
-      <p class="reading">1.21.1</p>
-      <p class="tag">Tested on both loaders</p>
-    </div>
-    <div class="cell">
-      <p class="reading">3.9+</p>
-      <p class="tag">Python, nothing else to install</p>
-    </div>
+  <section class="intro">
+    <img class="icon" src="icon.png" alt="">
+    <h1>mixinsmith</h1>
+    <p class="sub">Skills for coding agents that write Minecraft mods. Every name comes from your project's jars.</p>
+    <p class="meta"><span class="pad" data-state="live"></span>Python · Fabric · NeoForge</p>
   </section>
+
+  <section class="term" aria-label="Terminal">
+    <header><span class="pad" data-state="ok"></span>mixinsmith</header>
+    <p class="cmd"><span class="ctx">NeoForge 1.21.1, Parchment</span>$ python mcsrc.py method LivingEntity#hurt</p>
+    <p id="t-neo">public boolean hurt(DamageSource source, float amount)</p>
+    <p class="dim">  mixin target: hurt(Lnet/minecraft/world/damagesource/DamageSource;F)Z</p>
+    <div class="gap"></div>
+    <p class="cmd"><span class="ctx">Fabric 1.21.1, Yarn</span>$ python mcsrc.py method LivingEntity#damage</p>
+    <p>public boolean damage(DamageSource source, float amount)</p>
+    <p class="hit" id="t-yarn">  mixin target: damage(Lnet/minecraft/entity/damage/DamageSource;F)Z</p>
+  </section>
+
+  <p class="callout lit" id="c-target" style="left:696px;top:446px;width:400px"><b>The exact descriptor for your mappings</b>Read from the jars Gradle already downloaded, so Yarn gets damage and NeoForge gets hurt</p>
 </main>
+<script>
+  const top_ = id => { const r = document.getElementById(id).getBoundingClientRect(); return [r.left + 4, r.top - 10]; };
+  const under = (id, x) => { const r = document.getElementById(id).getBoundingClientRect(); return [x, r.bottom + 4]; };
+  traces([
+    [top_("c-target"), under("t-yarn", top_("c-target")[0]), { lit: true, r: 3.5 }],
+  ]);
+</script>
 </body>
 </html>
